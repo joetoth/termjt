@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
-	gc "github.com/gbin/goncurses"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
 	"syscall"
+
+	gc "github.com/rthornton128/goncurses"
+	"flag"
 )
 
 type state struct {
@@ -23,6 +25,9 @@ type section struct {
 }
 
 func main() {
+	filename := flag.String("outputFilename", "output file", "File to output selected contents to")
+	flag.Parse()
+
 	//in := bufio.NewReader(os.Stdin)
 	stats, err := os.Stdin.Stat()
 	if err != nil {
@@ -81,11 +86,14 @@ func main() {
 	for ch != 'q' {
 		ch = stdscr.GetChar()
 
-		if (ch == gc.KEY_RETURN) {
+		if ch == gc.KEY_RETURN {
 			gc.End()
+			b := ""
 			for _, c := range s.selected {
-				fmt.Println(s.content[s.index[c].begin:s.index[c].end])
+				b += s.content[s.index[c].begin:s.index[c].end]
 			}
+			b += "\n"
+			ioutil.WriteFile(*filename, []byte(b), 0644)
 			return
 		}
 
