@@ -82,9 +82,12 @@ func main() {
 
 	update(&s, stdscr)
 
-	var ch gc.Key
-	for ch != 'q' {
-		ch = stdscr.GetChar()
+	for {
+		ch := stdscr.GetChar()
+
+		if (ch == gc.KEY_EXIT) {
+			return
+		}
 
 		if ch == gc.KEY_RETURN {
 			gc.End()
@@ -92,7 +95,6 @@ func main() {
 			for _, c := range s.selected {
 				b += s.content[s.index[c].begin:s.index[c].end]
 			}
-			b += "\n"
 			ioutil.WriteFile(*filename, []byte(b), 0644)
 			return
 		}
@@ -131,7 +133,9 @@ func update(s *state, stdscr *gc.Window) {
 			if last_found != nil && i >= last_found.begin && i <= last_found.end && strings.Contains(s.selected, string(ascii)) {
 				stdscr.AttrOn(gc.A_BOLD)
 			}
-			stdscr.Print(string(s.content[i]))
+//			if (s.content[i] != '\n') {
+				stdscr.Print(string(s.content[i]))
+//			}
 			stdscr.AttrOff(gc.A_BOLD)
 		}
 	}
