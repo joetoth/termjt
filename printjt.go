@@ -6,9 +6,10 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
+
 	gc "github.com/gbin/goncurses"
 	"flag"
-	"syscall"
 	"unicode/utf8"
 )
 
@@ -26,9 +27,9 @@ type section struct {
 
 func main() {
 	filename := flag.String("outputFilename", "output file", "File to output selected contents to")
-	rf := flag.String("regexp", "(?m)\\S{10,}", "Regular expression to tokenize on")
 	flag.Parse()
 
+	//in := bufio.NewReader(os.Stdin)
 	stats, err := os.Stdin.Stat()
 	if err != nil {
 		fmt.Println("file.Stat()", err)
@@ -41,13 +42,6 @@ func main() {
 	}
 
 	b, err := ioutil.ReadAll(os.Stdin)
-	runes := ""
-	bc := b
-	for len(bc) > 0 {
-		r, size := utf8.DecodeLastRune(bc)
-		runes = string(r) + runes
-		bc = bc[:len(bc) - size]
-	}
 
 	if err != nil {
 		fmt.Println("STDIO error", err)
@@ -59,25 +53,34 @@ func main() {
 		fmt.Println("Error reopening /dev/tty", err)
 		return
 	}
-
-	err = syscall.Dup2(int(f.Fd()), 0)
-	if err != nil {
-		fmt.Println("Error Dup2", err)
-		return
-	}
+	syscall.Dup2(int(f.Fd()), 0)
 
 	stdscr, _ := gc.Init()
 	defer gc.End()
 
+	// Read text, if regex match replace first character (which is highlighted)
+	// write to screen
+	// have an input to type 'a-z'
+	// fully highlight match
+	// enter prints all matches to term
+
+
+	//	fmt.Println(string(b))
+
+	if (! utf8.Valid(b)) {
+		fmt.Println("NOT UTF8 VALID: " + string(b))
+		return
+	}
+
 	s := state{
-		content:  string(runes),
+		content:  string(b),
 		selected: "",
 		matches:  map[int]*section{},
 		index:    map[rune]*section{},
 	}
 
-	r := regexp.MustCompile(*rf)
-	indexes := r.FindAllStringIndex(string(runes), -1)
+	r := regexp.MustCompile(`(?m)\S{10,}`)
+	indexes := r.FindAllStringIndex(string(b), -1)
 	ascii := 'A'
 	for index := range indexes {
 		sc := section{begin: indexes[index][0], end: indexes[index][1]}
@@ -86,12 +89,12 @@ func main() {
 		ascii++
 	}
 
-	UpdateScreen(&s, stdscr)
+	update(&s, stdscr)
 
 	for {
 		ch := stdscr.GetChar()
 
-		if (ch == 27) {
+		if (ch == gc.KEY_EXIT) {
 			return
 		}
 
@@ -113,11 +116,11 @@ func main() {
 			// Add
 			s.selected += string(ch)
 		}
-		UpdateScreen(&s, stdscr)
+		update(&s, stdscr)
 	}
 }
 
-func UpdateScreen(s *state, stdscr *gc.Window) {
+func update(s *state, stdscr *gc.Window) {
 	stdscr.Clear()
 	var last_found *section
 	var ascii rune
@@ -141,10 +144,14 @@ func UpdateScreen(s *state, stdscr *gc.Window) {
 				stdscr.AttrOn(gc.A_BOLD)
 			}
 			ch := string(s.content[i])
+			//			if (s.content[i] != '\n' ) {
 			stdscr.Print(ch)
+			//			}
 			stdscr.AttrOff(gc.A_BOLD)
 		}
 	}
 
+	//	row, _ := stdscr.MaxYX()
+	//	stdscr.MovePrint(row - 1, 0, "selected = " + s.selected + "] >> ")
 	stdscr.Refresh()
 }
